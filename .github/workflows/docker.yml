@@ -1,0 +1,73 @@
+name: docker
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+jobs:
+  docker:
+    name: build and push image to docker hub
+    runs-on: ubuntu-latest
+    steps:
+    - name: checkout
+      uses: actions/checkout@v2
+
+    - name: prepare
+      id: prep
+      run: |
+        DOCKER_IMAGE="${{ github.repository }}"
+        VERSION=edge
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          VERSION=${GITHUB_REF#refs/tags/}
+        elif [[ $GITHUB_REF == refs/heads/* ]]; then
+          VERSION=$(echo ${GITHUB_REF#refs/heads/} | sed -r 's#/+#-#g')
+        elif [[ $GITHUB_REF == refs/pull/* ]]; then
+          VERSION=pr-${{ github.event.number }}
+        fi
+        TAGS="${DOCKER_IMAGE}:${VERSION}"
+        #if [ "${{ github.event_name }}" = "push" ]; then
+        #  TAGS="$TAGS,${DOCKER_IMAGE}:sha-${GITHUB_SHA::8}"
+        #fi
+        echo ::set-output name=version::${VERSION}
+        echo ::set-output name=tags::${TAGS}
+        echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
+    - name: setup QEMU
+      uses: docker/setup-qemu-action@v1
+
+    - name: setup docker buildx
+      uses: docker/setup-buildx-action@v1
+
+    - name: login DockerHub 
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_TOKEN }}
+
+    - name: buil and push 
+      id: docker_build
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        file: ./Dockerfile
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.prep.outputs.tags }}
+        tag_with_ref: true
+        repository: ${{ github.repository }}
+        build_args: |
+          gitCommit=${{ github.sha }}
+          semVer=${{ github.ref }}
+
+    - name: imge digest
+      run: echo ${{ steps.docker_build.outputs.digest }}
+
+    - name: post to CI/CD webhook
+      shell: bash
+      env:
+        TOKEN: ${{ secrets.K8_CI_TOKEN }}
+        URL: ${{ secrets.K8_CI_URL }}
+      run: |
+       curl $URL \
+        -X POST \
+        -H "Authorization: $TOKEN" \
+        --data-binary '{"deploy_name":"CHANGE-ME","container_name":"CHANGE-ME","img":"${{ steps.prep.outputs.tags }}"}'
+        
