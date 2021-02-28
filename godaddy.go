@@ -26,6 +26,30 @@ type goDaddy struct {
 	uri, key, sercet string
 }
 
+func newGodday() *goDaddy {
+	g := new(goDaddy)
+	g.uri = "https://api.godaddy.com"
+	g.key = os.Getenv(daddyEnvKey)
+	g.sercet = os.Getenv(daddyEnvSecret)
+	return g
+}
+
+func (g *goDaddy) workWithRetry(retry int) {
+	for i := 0; i < retry; i++ {
+		err := g.doWork()
+		if err != nil {
+			log.Error().
+				Err(err).
+				Int("round", i).
+				Msg("do work failed, retrying")
+			delay := math.Pow(2, float64(i+1))
+			time.Sleep(time.Duration(delay) * time.Second)
+			continue
+		}
+		return
+	}
+}
+
 func (g *goDaddy) doWork() error {
 	ipOnGateWay, err := g.getMyIP()
 	if err != nil {
@@ -56,73 +80,22 @@ func (g *goDaddy) doWork() error {
 }
 
 func (g *goDaddy) sync() {
-	g.init()
 	for {
-		go func() {
-			// retry for dns issue
-			for retry := 0; retry < 5; retry++ {
-				err := g.doWork()
-				if err != nil {
-					log.Error().
-						Err(err).
-						Int("try", retry).
-						Msg("do work failed")
-					delay := math.Pow(2, float64(retry+1))
-					time.Sleep(time.Duration(delay) * time.Second)
-					continue
-				}
-				return
-			}
-		}()
-		time.Sleep(6 * time.Hour)
+		g.workWithRetry(5)
+		time.Sleep(24*time.Hour + 32*time.Minute)
 	}
 }
 
 // container should be point value
 func (g *goDaddy) doAPI(method, path string, payload io.Reader, container interface{}) error {
 	cli := g.getClient()
-	req, err := http.NewRequest(method, g.uri+path, payload)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Str("path", path).
-			Msg("fail to creat request")
-		return err
+	agent := &reqAgent{
+		cli:    cli,
+		cb:     g.setAuthHeader,
+		method: method,
+		url:    g.uri + path,
 	}
-	if payload != nil {
-		req.Header.Set("Content-Type", "application/json;charset=UTF-8")
-	}
-	g.setAuthHeader(req)
-	res, err := cli.Do(req)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Str("path", path).
-			Msg("fail to do request")
-		return err
-	}
-	defer res.Body.Close()
-	if container != nil {
-		err = json.NewDecoder(res.Body).Decode(container)
-		if err != nil {
-			log.Error().
-				Err(err).
-				Str("path", path).
-				Msg("fail to unmarsh res.body")
-			return err
-		}
-		return nil
-	}
-	if res.StatusCode > 399 || res.StatusCode < 200 {
-		return errors.New("http response code not ok: " + res.Status)
-	}
-	return nil
-}
-
-func (g *goDaddy) init() {
-	g.uri = "https://api.godaddy.com"
-	g.key = os.Getenv(daddyEnvKey)
-	g.sercet = os.Getenv(daddyEnvSecret)
+	return agent.doHTTP(payload, container)
 }
 
 func (g *goDaddy) setAuthHeader(r *http.Request) {
@@ -143,23 +116,12 @@ func (g *goDaddy) getClient() *http.Client {
 }
 
 func (g *goDaddy) getMyIP() (string, error) {
-	url := "https://www.ip.cn/api/index?ip=&type=0"
 	cli := g.getClient()
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("fail to creat request")
-		return "", err
+	agent := &reqAgent{
+		cli:    cli,
+		method: http.MethodGet,
+		url:    "https://www.ip.cn/api/index?ip=&type=0",
 	}
-	res, err := cli.Do(req)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("fail to do request")
-		return "", err
-	}
-	defer res.Body.Close()
 	data := struct {
 		Rs       int    `json:"rs"`
 		Code     int    `json:"code"`
@@ -167,11 +129,11 @@ func (g *goDaddy) getMyIP() (string, error) {
 		IP       string `json:"ip"`
 		Isdomain int    `json:"isdomain"`
 	}{}
-	err = json.NewDecoder(res.Body).Decode(&data)
+	err := agent.doHTTP(nil, &data)
 	if err != nil {
 		log.Error().
 			Err(err).
-			Msg("fail to unmarsh res.body")
+			Msg("agent doHTTP failed")
 		return "", err
 	}
 	log.Info().

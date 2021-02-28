@@ -2,6 +2,6 @@ package main
 
 func main() {
 	parseFlag()
-	g := new(goDaddy)
+	g := newGodday()
 	g.sync()
 }
