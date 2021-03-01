@@ -6,7 +6,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/json"
-	"log"
 	"os"
 
 	"github.com/go-acme/lego/v4/certcrypto"
@@ -82,7 +81,7 @@ func newCert(domain string) error {
 	}
 	certificates, err := client.Certificate.Obtain(request)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	err = os.WriteFile(os.Getenv(tlsKey), certificates.PrivateKey, 0o600)
