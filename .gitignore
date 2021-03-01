@@ -1,3 +1,4 @@
 ddns
 .env
 .DS_Store
+cert/
