@@ -17,33 +17,41 @@ import (
 )
 
 type bot struct {
-	u                 *user
-	cli               *lego.Client
-	provider          challenge.Provider
-	privateKey, certs []byte
+	u        *user
+	cli      *lego.Client
+	provider challenge.Provider
+	certs    []byte
 }
 
 func newBot(u *user, p challenge.Provider) (*bot, error) {
+	b := &bot{provider: p}
+	pk, err := b.loadCertKey()
+	if err != nil {
+		return nil, err
+	}
+	var privateKey crypto.PrivateKey
+	if pk != nil {
+		privateKey, err = certcrypto.ParsePEMPrivateKey(pk)
+	} else {
+		privateKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	}
+	if err != nil {
+		return nil, err
+	}
+	u.key = privateKey
 	config := lego.NewConfig(u)
 	config.Certificate.KeyType = certcrypto.RSA2048
 	client, err := lego.NewClient(config)
 	if err != nil {
 		return nil, err
 	}
-	b := &bot{
-		u:        u,
-		cli:      client,
-		provider: p,
-	}
+	b.u = u
+	b.cli = client
 	return b, nil
 }
 
 func (b *bot) run(domain string) error {
-	loaded, err := b.loadCertKey()
-	if err != nil {
-		return err
-	}
-	if !loaded {
+	if b.certs == nil {
 		r := retryFunc(func() error {
 			return b.newCert(domain)
 		})
@@ -59,12 +67,7 @@ func (b *bot) run(domain string) error {
 }
 
 func (b *bot) newCert(domain string) error {
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return err
-	}
-	b.u.key = privateKey
-	err = b.cli.Challenge.SetDNS01Provider(b.provider)
+	err := b.cli.Challenge.SetDNS01Provider(b.provider)
 	if err != nil {
 		return err
 	}
@@ -82,7 +85,6 @@ func (b *bot) newCert(domain string) error {
 	if err != nil {
 		return err
 	}
-	b.privateKey = certificates.PrivateKey
 	b.certs = certificates.Certificate
 	return b.saveAll(certificates)
 }
@@ -111,10 +113,7 @@ func (b *bot) renew(domain string, reuse bool) error {
 	}
 	var privateKey crypto.PrivateKey
 	if reuse {
-		privateKey, err = certcrypto.ParsePEMPrivateKey(b.privateKey)
-		if err != nil {
-			return err
-		}
+		privateKey = b.u.key
 	}
 	request := certificate.ObtainRequest{
 		Domains:    []string{domain},
@@ -149,7 +148,7 @@ func (b *bot) saveAll(res *certificate.Resource) error {
 	return json.NewEncoder(all).Encode(res)
 }
 
-func (b *bot) loadCertKey() (bool, error) {
+func (b *bot) loadCertKey() ([]byte, error) {
 	const (
 		tlsKey  = "TLS_KEY_FN"
 		tlsCert = "TLS_CERT_FN"
@@ -157,18 +156,17 @@ func (b *bot) loadCertKey() (bool, error) {
 	kb, err := os.ReadFile(os.Getenv(tlsKey))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return false, nil
+			return nil, nil
 		}
-		return false, err
+		return nil, err
 	}
 	cb, err := os.ReadFile(os.Getenv(tlsCert))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return false, nil
+			return nil, nil
 		}
-		return false, err
+		return nil, err
 	}
-	b.privateKey = kb
 	b.certs = cb
-	return true, nil
+	return kb, nil
 }
