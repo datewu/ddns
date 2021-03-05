@@ -6,22 +6,25 @@ func main() {
 	parseFlag()
 	g := newGodday()
 	go g.sync()
-	p, err := g.newProvider()
+	err := runCertBot(g)
 	if err != nil {
 		log.Error().
 			Err(err).
-			Msg("fail to goaddy dns provider")
-		return
+			Msg("fail to run cert bot")
+	}
+}
+
+func runCertBot(g *goDaddy) error {
+	p, err := g.newProvider()
+	if err != nil {
+		return err
 	}
 	u := &user{
 		Email: "hihahajun@gmail.com",
 	}
 	b, err := newBot(u, p)
 	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("fail init lego bot")
-		return
+		return err
 	}
-	b.run("blog.wutuofu.com")
+	return b.run("blog.wutuofu.com")
 }
