@@ -44,10 +44,16 @@ func (b *bot) run(domain string) error {
 		return err
 	}
 	if !loaded {
-		b.newCert(domain)
+		r := retryFunc(func() error {
+			return b.newCert(domain)
+		})
+		r.retry(5)
 	}
 	for {
-		b.renew(domain, false)
+		r := retryFunc(func() error {
+			return b.renew(domain, false)
+		})
+		r.retry(5)
 		time.Sleep(7 * 24 * time.Hour)
 	}
 }

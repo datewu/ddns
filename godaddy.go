@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"os"
 	"time"
@@ -44,22 +43,6 @@ func newGodday() *goDaddy {
 	return g
 }
 
-func (g *goDaddy) workWithRetry(retry int) {
-	for i := 0; i < retry; i++ {
-		err := g.doWork()
-		if err != nil {
-			log.Error().
-				Err(err).
-				Int("round", i).
-				Msg("do work failed, retrying")
-			delay := math.Pow(2, float64(i+1))
-			time.Sleep(time.Duration(delay) * time.Second)
-			continue
-		}
-		return
-	}
-}
-
 func (g *goDaddy) doWork() error {
 	ipOnGateWay, err := g.getMyIP()
 	if err != nil {
@@ -91,7 +74,8 @@ func (g *goDaddy) doWork() error {
 
 func (g *goDaddy) sync() {
 	for {
-		g.workWithRetry(5)
+		r := retryFunc(g.doWork)
+		r.retry(5)
 		time.Sleep(24*time.Hour + 32*time.Minute)
 	}
 }

@@ -17,5 +17,11 @@ func main() {
 		Email: "hihahajun@gmail.com",
 	}
 	b, err := newBot(u, p)
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("fail init lego bot")
+		return
+	}
 	b.run("blog.wutuofu.com")
 }
