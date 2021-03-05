@@ -12,6 +12,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/go-acme/lego/v4/challenge"
+	god "github.com/go-acme/lego/v4/providers/dns/godaddy"
 	"github.com/rs/zerolog/log"
 )
 
@@ -24,6 +26,14 @@ const (
 
 type goDaddy struct {
 	uri, key, sercet string
+}
+
+func (g *goDaddy) newProvider() (challenge.Provider, error) {
+	c := god.NewDefaultConfig()
+	c.APIKey = os.Getenv(daddyEnvKey)
+	c.APISecret = os.Getenv(daddyEnvSecret)
+
+	return god.NewDNSProviderConfig(c)
 }
 
 func newGodday() *goDaddy {
