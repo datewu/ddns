@@ -76,7 +76,7 @@ func (g *goDaddy) sync() {
 	for {
 		r := retryFunc(g.doWork)
 		r.retry(5)
-		time.Sleep(24*time.Hour + 32*time.Minute)
+		time.Sleep(42 * time.Minute)
 	}
 }
 
