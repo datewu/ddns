@@ -1,4 +1,4 @@
-FROM golang:1.16.0-alpine as builder
+FROM golang:1.16.2-alpine as builder
 RUN apk add ca-certificates git
 ARG gitCommit
 ARG semVer
