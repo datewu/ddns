@@ -19,9 +19,7 @@ func runCertBot(g *goDaddy) error {
 	if err != nil {
 		return err
 	}
-	u := &user{
-		Email: "hihahajun@gmail.com",
-	}
+	u := newUser("hihahajun@gmail.com")
 	b, err := newBot(u, p)
 	if err != nil {
 		return err

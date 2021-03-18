@@ -12,6 +12,13 @@ type user struct {
 	key          crypto.PrivateKey
 }
 
+func newUser(email string) *user {
+	u := &user{
+		Email: email,
+	}
+	return u
+}
+
 func (u *user) GetEmail() string {
 	return u.Email
 }
