@@ -1,1 +1,11 @@
-Hello ddns 2021年 2月27日 星期六 16时29分34秒 CST
+# ddns
+dynamic dns sync
+
+[![Go Report Card](https://goreportcard.com/badge/github.com/datewu/security?style=flat-square)](https://goreportcard.com/report/github.com/datewu/ddns)
+[![Godoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://godoc.org/github.com/datewu/ddns)
+
+## Description
+Sync your home router IP record to godaddy DNS record.
+
+## Usage
+Deploy in a k8s cluster.
