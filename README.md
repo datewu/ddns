@@ -6,6 +6,7 @@ dynamic dns sync
 
 ## Description
 Sync your home router IP record to godaddy DNS record.
+And get/auto-renew(thanks to Lego) a Let's Encrypt certificate for the given domain.
 
 ## Usage
 Deploy in a k8s cluster.
